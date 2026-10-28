@@ -6,7 +6,7 @@ Ficheiros: `index.html` (a app), `config.js` (as tuas chaves), `schema.sql` (bas
 ## 1. Supabase
 1. Usa um projecto existente ou cria um novo em supabase.com.
 2. **SQL Editor → New query** → colar todo o `schema.sql` → **Run**.
-   (cria as tabelas `teares_afinacoes` e `teares_anexos`, o bucket privado `teares-anexos` e as regras de segurança).
+   (cria a tabela `teares_afinacoes`, e as regras de segurança).
 3. **Authentication → Users → Add user** → e-mail + palavra-passe (marcar *Auto Confirm*).
    Desactivar registos públicos: Authentication → Sign In / Providers → Email → desligar "Allow new users to sign up".
 4. **Project Settings → API**: copiar *Project URL* e a chave *anon public*.

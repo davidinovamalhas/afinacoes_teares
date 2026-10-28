@@ -65,13 +65,6 @@ label.f input:focus,label.f textarea:focus,.toolbar input:focus,.toolbar select:
 label.f textarea{min-height:70px;resize:vertical}
 .req::after{content:" *";color:var(--danger)}
 .formbar{position:sticky;bottom:0;background:linear-gradient(transparent,var(--paper) 30%);padding:14px 0 calc(10px + env(safe-area-inset-bottom));display:flex;gap:8px;flex-wrap:wrap}
-.thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin-top:8px}
-.thumb{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff}
-.thumb .im{height:120px;background:#eee center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:var(--mute);font-size:13px}
-.thumb .b{padding:6px}
-.thumb input{width:100%;border:1px solid var(--line);border-radius:6px;padding:4px 6px;font-size:13px}
-.thumb .x{display:flex;justify-content:space-between;align-items:center;margin-top:4px;font-size:12px;color:var(--mute)}
-.thumb a{color:var(--danger);cursor:pointer;text-decoration:underline}
 /* login / tipos */
 .login{max-width:360px;margin:8vh auto}
 .tipos{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
@@ -95,10 +88,6 @@ label.f textarea{min-height:70px;resize:vertical}
 .kv .w2{grid-column:span 2}
 .kv span{font-weight:600;word-break:break-word}
 .sheet .fgroup{break-inside:avoid}
-.fotos{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.fotos figure{margin:0;border:1px solid var(--line);border-radius:6px;padding:6px;break-inside:avoid;text-align:center}
-.fotos img{max-width:100%;max-height:95mm;object-fit:contain}
-.fotos figcaption{font-size:12px;color:var(--ink2);margin-top:4px}
 .sh-foot{margin-top:14px;font-size:11px;color:var(--mute);display:flex;justify-content:space-between;border-top:1px solid var(--line);padding-top:6px}
 .opts{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
 .opts label{display:flex;gap:6px;align-items:center}
@@ -113,7 +102,6 @@ label.f textarea{min-height:70px;resize:vertical}
   table.list td.hide-m{display:none}
   table.list td.acts{grid-column:1/-1;text-align:left;padding-top:6px}
   .grid{grid-template-columns:repeat(2,1fr)}
-  .fotos{grid-template-columns:1fr}
 }
 /* impressão */
 @media print{
@@ -122,7 +110,6 @@ label.f textarea{min-height:70px;resize:vertical}
   header.top,.noprint,.toast{display:none!important}
   main{padding:0;max-width:none}
   .sheet{border:0;padding:0;max-width:none;border-radius:0}
-  .fotos img{max-height:85mm}
 }
 </style>
 </head>
@@ -203,10 +190,10 @@ const labelOf = (t,k) => { for (const g of TIPOS[t].grupos) for (const x of g.f)
    2. SUPABASE
    ===================================================================== */
 const CFG = window.APP_CONFIG || {};
-const T_REG='teares_afinacoes', T_ANX='teares_anexos', BUCKET = CFG.BUCKET || 'teares-anexos';
+const T_REG='teares_afinacoes';
 const configured = CFG.SUPABASE_URL && !/SEU-PROJETO/.test(CFG.SUPABASE_URL) && CFG.SUPABASE_ANON_KEY && !/COLE-AQUI/.test(CFG.SUPABASE_ANON_KEY);
 let sb = null;
-const S = { user:null, regs:[], anx:{}, urls:{}, filt:{q:'',tear:'',cliente:'',ano:''} };
+const S = { user:null, regs:[], filt:{q:'',tear:'',cliente:'',ano:''} };
 
 const $ = (s,r=document) => r.querySelector(s);
 const $$ = (s,r=document) => [...r.querySelectorAll(s)];
@@ -225,18 +212,7 @@ async function fetchAll(table, col, asc){
   }
   return out;
 }
-async function loadAll(){
-  const [regs, anx] = await Promise.all([fetchAll(T_REG,'data',false), fetchAll(T_ANX,'created_at',true)]);
-  S.regs = regs; S.anx = {};
-  anx.forEach(a => (S.anx[a.afinacao_id] ||= []).push(a));
-}
-async function signed(paths){
-  const need = paths.filter(p => !S.urls[p]);
-  if(need.length){
-    const {data} = await sb.storage.from(BUCKET).createSignedUrls(need, 3600);
-    (data||[]).forEach(x => { if(x.signedUrl) S.urls[x.path] = x.signedUrl; });
-  }
-}
+async function loadAll(){ S.regs = await fetchAll(T_REG,'data',false); }
 
 /* =====================================================================
    3. ROUTER
@@ -310,7 +286,7 @@ function viewList(tipo){
     </div>
     <div class="tbl-wrap"><table class="list"><thead id="thead"></thead><tbody id="tb"></tbody></table><div id="cnt" class="empty" hidden></div></div>`;
   $('#thead').innerHTML = `<tr>${t?'':'<th>Tipo</th>'}<th>Tear</th><th>Data</th><th>Cliente</th>` +
-    (t ? t.cols.map(k=>`<th class="hide-m">${esc(labelOf(tipo,k))}</th>`).join('') : '<th class="hide-m">Fio</th>') + `<th class="hide-m">Anexos</th><th></th></tr>`;
+    (t ? t.cols.map(k=>`<th class="hide-m">${esc(labelOf(tipo,k))}</th>`).join('') : '<th class="hide-m">Fio</th>') + `<th></th></tr>`;
   const draw = () => {
     S.filt.q=$('#q').value; S.filt.tear=$('#ftear').value; S.filt.cliente=$('#fcli').value; S.filt.ano=$('#fano').value;
     const q = S.filt.q.trim().toLowerCase();
@@ -319,12 +295,11 @@ function viewList(tipo){
       (!S.filt.ano || r.data.startsWith(S.filt.ano)) &&
       (!q || (r.cliente+' '+(r.observacoes||'')+' '+Object.values(r.dados||{}).join(' ')+' '+r.tear).toLowerCase().includes(q)));
     $('#tb').innerHTML = rows.map(r => {
-      const rt = TIPOS[r.tipo]; const d = r.dados||{}; const na=(S.anx[r.id]||[]).length;
+      const rt = TIPOS[r.tipo]; const d = r.dados||{};
       return `<tr class="row" data-id="${r.id}">
         ${t?'':`<td><span class="chip" style="background:${rt.cor}1a;color:${rt.cor}">${esc(rt.nome)}</span></td>`}
         <td class="tear">${r.tear}</td><td>${fmtData(r.data)}</td><td>${esc(r.cliente)}</td>
         ${t ? t.cols.map(k=>`<td class="hide-m">${esc(d[k])}</td>`).join('') : `<td class="hide-m">${esc(d.fio||d.fio_jersey)}</td>`}
-        <td class="hide-m">${na?na+' 📎':''}</td>
         <td class="acts"><a class="btn sm" href="#/ficha/${r.id}">Ficha</a> <a class="btn sm" href="#/editar/${r.id}">Editar</a>
           <a class="btn sm" href="#/duplicar/${r.id}">Duplicar</a> <button class="btn sm dng" data-del="${r.id}">Eliminar</button></td></tr>`;
     }).join('');
@@ -344,27 +319,13 @@ async function apagar(id){
   const r = S.regs.find(x=>x.id===id); if(!r) return;
   if(!confirm(`Eliminar a afinação do tear ${r.tear} (${fmtData(r.data)} – ${r.cliente})? Esta ação não pode ser desfeita.`)) return;
   try{
-    const paths = (S.anx[id]||[]).map(a=>a.path);
-    if(paths.length) await sb.storage.from(BUCKET).remove(paths);
     const {error} = await sb.from(T_REG).delete().eq('id',id); if(error) throw error;
-    S.regs = S.regs.filter(x=>x.id!==id); delete S.anx[id];
+    S.regs = S.regs.filter(x=>x.id!==id);
     toast('Registo eliminado'); render();
   }catch(e){ toast('Erro: '+e.message, true); }
 }
 
 /* ---------- formulário ---------- */
-async function reduzirImagem(file, max=1800){
-  if(!file.type.startsWith('image/') || file.type==='image/svg+xml') return file;
-  try{
-    const bmp = await createImageBitmap(file);
-    const k = Math.min(1, max/Math.max(bmp.width,bmp.height));
-    const c = document.createElement('canvas'); c.width=Math.round(bmp.width*k); c.height=Math.round(bmp.height*k);
-    c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);
-    const blob = await new Promise(r=>c.toBlob(r,'image/jpeg',.82));
-    return blob && blob.size<file.size ? new File([blob], file.name.replace(/\.\w+$/,'')+'.jpg',{type:'image/jpeg'}) : file;
-  }catch{ return file; }
-}
-
 async function viewForm({tipo, reg, copia}){
   const edit = !!reg; const src = reg || copia;
   tipo = tipo || reg.tipo; const t = TIPOS[tipo];
@@ -374,9 +335,6 @@ async function viewForm({tipo, reg, copia}){
     const cls = x.w===2?'w2':x.w===3?'w3':'';
     return `<label class="f ${cls}">${esc(x.l)}<input name="d_${x.k}" value="${esc(d[x.k])}" autocomplete="off"></label>`;
   };
-  let existing = edit ? [...(S.anx[reg.id]||[])] : [];
-  const removed = []; const pending = [];
-  if(existing.length) await signed(existing.map(a=>a.path));
 
   app.innerHTML = `<form id="rf" autocomplete="off">
     <h1><span class="chip" style="background:${t.cor}1a;color:${t.cor}">${esc(t.nome)}</span> ${edit?'Editar afinação':copia?'Nova afinação (cópia)':'Nova afinação'}</h1>
@@ -389,40 +347,10 @@ async function viewForm({tipo, reg, copia}){
       </div></div>
       ${t.grupos.map(g=>`<div class="fgroup"><h2>${esc(g.t)}</h2><div class="grid">${g.f.map(input).join('')}</div></div>`).join('')}
       <div class="fgroup"><h2>Observações</h2><label class="f"><textarea name="observacoes">${esc(src?src.observacoes:'')}</textarea></label></div>
-      <div class="fgroup"><h2>Imagens e anexos da malha (ficha técnica)</h2>
-        <input type="file" id="files" accept="image/*,application/pdf" multiple hidden>
-        <button type="button" class="btn" id="addf">+ Adicionar fotos / PDF</button>
-        <span style="color:var(--mute);font-size:13px"> No telemóvel pode tirar a foto diretamente.</span>
-        <div class="thumbs" id="thumbs"></div></div>
     </div>
     <div class="formbar"><button class="btn pri" id="save">Guardar</button><a class="btn" href="${edit?'#/ficha/'+reg.id:'#/tipo/'+tipo}">Cancelar</a></div>
   </form>`;
 
-  const drawThumbs = () => {
-    $('#thumbs').innerHTML =
-      existing.map(a => `<div class="thumb" data-ex="${a.id}"><div class="im" style="${a.mime?.startsWith('image/')&&S.urls[a.path]?`background-image:url('${S.urls[a.path]}')`:''}">${a.mime?.startsWith('image/')?'':'PDF'}</div>
-        <div class="b"><input data-leg="${a.id}" placeholder="Legenda" value="${esc(a.legenda)}"><div class="x"><span>${esc(a.nome||'')}</span><a data-rmx="${a.id}">remover</a></div></div></div>`).join('') +
-      pending.map((p,i) => `<div class="thumb"><div class="im" style="${p.url?`background-image:url('${p.url}')`:''}">${p.url?'':'PDF'}</div>
-        <div class="b"><input data-pleg="${i}" placeholder="Legenda" value="${esc(p.legenda)}"><div class="x"><span>novo</span><a data-rmp="${i}">remover</a></div></div></div>`).join('');
-  };
-  drawThumbs();
-  $('#addf').onclick = () => $('#files').click();
-  $('#files').onchange = async e => {
-    for(const f0 of e.target.files){
-      const file = await reduzirImagem(f0);
-      pending.push({file, legenda:'', url: file.type.startsWith('image/') ? URL.createObjectURL(file) : null});
-    }
-    e.target.value=''; drawThumbs();
-  };
-  $('#thumbs').addEventListener('click', e => {
-    const x=e.target.closest('[data-rmx]'), p=e.target.closest('[data-rmp]');
-    if(x){ const i=existing.findIndex(a=>a.id===x.dataset.rmx); removed.push(existing[i]); existing.splice(i,1); drawThumbs(); }
-    if(p){ pending.splice(+p.dataset.rmp,1); drawThumbs(); }
-  });
-  $('#thumbs').addEventListener('input', e => {
-    if(e.target.dataset.leg) existing.find(a=>a.id===e.target.dataset.leg).legenda = e.target.value;
-    if(e.target.dataset.pleg) pending[+e.target.dataset.pleg].legenda = e.target.value;
-  });
 
   $('#rf').onsubmit = async e => {
     e.preventDefault();
@@ -436,21 +364,6 @@ async function viewForm({tipo, reg, copia}){
       let id;
       if(edit){ const {error}=await sb.from(T_REG).update(row).eq('id',reg.id); if(error) throw error; id=reg.id; }
       else { const {data,error}=await sb.from(T_REG).insert(row).select().single(); if(error) throw error; id=data.id; }
-      // anexos removidos
-      if(removed.length){
-        await sb.storage.from(BUCKET).remove(removed.map(a=>a.path));
-        const {error}=await sb.from(T_ANX).delete().in('id',removed.map(a=>a.id)); if(error) throw error;
-      }
-      // legendas alteradas
-      for(const a of existing){ const o=(S.anx[id]||[]).find(z=>z.id===a.id); if(o && (o.legenda||'')!==(a.legenda||'')) await sb.from(T_ANX).update({legenda:a.legenda||null}).eq('id',a.id); }
-      // novos anexos
-      for(const p of pending){
-        const safe = p.file.name.replace(/[^\w.\-]+/g,'_');
-        const path = `${id}/${Date.now()}-${Math.random().toString(36).slice(2,7)}-${safe}`;
-        const up = await sb.storage.from(BUCKET).upload(path, p.file, {contentType:p.file.type});
-        if(up.error) throw up.error;
-        const {error}=await sb.from(T_ANX).insert({afinacao_id:id, path, nome:p.file.name, mime:p.file.type, legenda:p.legenda||null}); if(error) throw error;
-      }
       await loadAll();
       toast('Guardado'); location.hash = '#/ficha/'+id;
     }catch(err){ toast('Erro ao guardar: '+(err.message||err), true); btn.disabled=false; btn.textContent='Guardar'; }
@@ -459,24 +372,19 @@ async function viewForm({tipo, reg, copia}){
 
 /* ---------- ficha técnica (ecrã + impressão) ---------- */
 async function viewFicha(r){
-  const t = TIPOS[r.tipo], d = r.dados||{}, anx = S.anx[r.id]||[];
-  if(anx.length) await signed(anx.map(a=>a.path));
+  const t = TIPOS[r.tipo], d = r.dados||{};
   const draw = () => {
-    const vazios = $('#ov')?.checked, imgs = $('#oi')?.checked ?? true;
+    const vazios = $('#ov')?.checked;
     const grupos = t.grupos.map(g => {
       const fs = g.f.filter(x => vazios || d[x.k]);
       if(!fs.length) return '';
       return `<div class="fgroup"><h2>${esc(g.t)}</h2><div class="kv">${fs.map(x=>`<div class="${x.w===2?'w2':''}"><b>${esc(x.l)}</b><span>${esc(d[x.k])||'&nbsp;'}</span></div>`).join('')}</div></div>`;
     }).join('');
-    const fotos = anx.filter(a=>a.mime?.startsWith('image/') && S.urls[a.path]);
-    const pdfs = anx.filter(a=>!a.mime?.startsWith('image/'));
     $('#sheet').innerHTML = `
       <div class="sh-head"><div><div class="emp">${esc(CFG.EMPRESA||'')}</div><h1>Ficha técnica de afinação</h1></div><div class="tp">${esc(t.nome)}</div></div>
       <div class="meta"><div><b>Nº Tear</b><span class="big">${r.tear}</span></div><div><b>Data</b><span class="big">${fmtData(r.data)}</span></div><div style="grid-column:span 2"><b>Cliente</b><span class="big">${esc(r.cliente)}</span></div></div>
       ${grupos}
       ${r.observacoes?`<div class="fgroup"><h2>Observações</h2><div style="white-space:pre-wrap;border:1px solid var(--line);border-radius:6px;padding:8px">${esc(r.observacoes)}</div></div>`:''}
-      ${imgs && fotos.length?`<div class="fgroup"><h2>Imagens da malha</h2><div class="fotos">${fotos.map(a=>`<figure><img src="${S.urls[a.path]}" alt=""><figcaption>${esc(a.legenda||'')}</figcaption></figure>`).join('')}</div></div>`:''}
-      ${pdfs.length?`<div class="fgroup noprint"><h2>Outros anexos</h2>${pdfs.map(a=>`<a href="${S.urls[a.path]||'#'}" target="_blank" rel="noopener">${esc(a.legenda||a.nome||'anexo')}</a>`).join(' · ')}</div>`:''}
       <div class="sh-foot"><span>Registo: ${new Date(r.created_at).toLocaleDateString('pt-PT')}</span><span>Impresso em ${new Date().toLocaleDateString('pt-PT')}</span></div>`;
   };
   app.innerHTML = `
@@ -487,11 +395,10 @@ async function viewFicha(r){
       <a class="btn" href="#/duplicar/${r.id}">Duplicar</a>
       <button class="btn pri" id="pr">Imprimir / PDF</button>
     </div>
-    <div class="opts noprint"><label><input type="checkbox" id="ov"> Mostrar campos vazios</label><label><input type="checkbox" id="oi" checked> Incluir imagens</label></div>
+    <div class="opts noprint"><label><input type="checkbox" id="ov"> Mostrar campos vazios</label></div>
     <div class="sheet" id="sheet"></div>`;
-  $('#ov').onchange = $('#oi').onchange = draw;
+  $('#ov').onchange = draw;
   $('#pr').onclick = async () => {
-    await Promise.all($$('#sheet img').map(i => i.complete ? 0 : new Promise(r=>{i.onload=i.onerror=r;})));
     window.print();
   };
   draw();
@@ -508,7 +415,7 @@ function viewTools(){
     <button class="btn" id="expcsv">Exportar tudo (CSV)</button> <button class="btn" id="expjson">Cópia de segurança (JSON)</button></div>`;
   $('#xl').onchange = e => $('#doimp').disabled = !e.target.files.length;
   $('#doimp').onclick = importarExcel;
-  $('#expjson').onclick = () => baixar('afinacoes-backup-'+hoje()+'.json', JSON.stringify({regs:S.regs, anexos:S.anx},null,1), 'application/json');
+  $('#expjson').onclick = () => baixar('afinacoes-backup-'+hoje()+'.json', JSON.stringify({regs:S.regs},null,1), 'application/json');
   $('#expcsv').onclick = () => {
     const q = v => '"'+String(v??'').replace(/"/g,'""')+'"';
     const lines = [['Tipo','Nº Tear','Data','Cliente','Campo','Valor'].map(q).join(';')];
@@ -577,7 +484,7 @@ async function boot(){
     const novo = s?.user || null;
     if((novo?.id) === (S.user?.id)) return;
     S.user = novo;
-    if(S.user){ try{ await loadAll(); }catch(e){ toast('Erro a carregar: '+e.message, true); } } else { S.regs=[]; S.anx={}; }
+    if(S.user){ try{ await loadAll(); }catch(e){ toast('Erro a carregar: '+e.message, true); } } else { S.regs=[]; }
     render();
   });
 }
