@@ -53,9 +53,23 @@ td.tear{font-weight:700;font-variant-numeric:tabular-nums}
 .art{min-width:170px;max-width:340px}
 td.obs{max-width:260px;color:var(--ink2);font-size:13px}
 td.lfa{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
-.mfio .xrow{display:flex;gap:6px;margin-top:6px}
-.mfio .xrow input{flex:1;font-size:12px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#fff;min-height:40px}
-.mfio .addfio{margin-top:6px}
+/* blocos coloridos */
+.blk{background:var(--bg);border:1px solid var(--bd);border-left:7px solid var(--bd);border-radius:10px;padding:10px 14px 12px;margin-bottom:12px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.blk>h2{display:inline-block;margin:0 0 8px;background:var(--bd);color:#fff;border-radius:12px;padding:2px 12px;font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+.blk label.f input,.blk label.f textarea{border-color:color-mix(in srgb,var(--bd) 45%,#fff)}
+.blk label.f{color:var(--tx)}
+.yrow{display:grid;grid-template-columns:minmax(200px,3fr) repeat(var(--n),minmax(78px,1fr)) 34px;gap:8px;align-items:end;margin-bottom:6px}
+.yrow.extra .lb{display:none}
+.yrow .rmfio{min-height:40px;padding:0}
+.addfio{margin-top:4px;border-color:var(--bd);color:var(--tx);background:#fff}
+.lt{width:100%;border-collapse:separate;border-spacing:0 3px}
+.lt th{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--tx);text-align:left;padding:0 8px}
+.lt td{background:#fff;border:1px solid color-mix(in srgb,var(--bd) 40%,#fff);border-width:1px 0;padding:5px 8px;font-weight:600}
+.lt td:first-child{border-left-width:1px;border-radius:6px 0 0 6px}.lt td:last-child{border-right-width:1px;border-radius:0 6px 6px 0}
+.lt td.fio{width:34%}
+.kv .w3{grid-column:1/-1}.kv .big{font-size:16px}
+.blk .kv div{background:#fff;border-color:color-mix(in srgb,var(--bd) 40%,#fff)}
+.sheet .blk{break-inside:avoid;padding:8px 12px 10px;margin-bottom:9px}
 .empty{padding:40px;text-align:center;color:var(--mute)}
 .count{color:var(--mute);font-size:13px;margin-left:auto}
 /* form */
@@ -110,6 +124,10 @@ label.f textarea{min-height:70px;resize:vertical}
   table.list td.lfa::before{content:'LFA ';color:var(--mute);font-weight:400}
   table.list td.acts{grid-column:1/-1;text-align:left;padding-top:6px}
   .grid{grid-template-columns:repeat(2,1fr)}
+  .yrow{grid-template-columns:1fr 1fr 1fr}
+  .yrow label:first-child{grid-column:1/-1}
+  .yrow .rmfio{min-height:36px}
+  .yrow.extra .rmfio{grid-column:1/-1}
 }
 /* impressão */
 @media print{
@@ -141,61 +159,86 @@ label.f textarea{min-height:70px;resize:vertical}
    Para acrescentar/alterar campos basta editar esta secção.
    ===================================================================== */
 const f = (k,l,o={}) => ({k,l,...o});
-const camada = (p,nome,ponto) => ({t:nome, f:[
-  f(p+'_lfa','LFA'), f(p+'_afin','Afinação'),
-  ...(ponto==='placa' ? [f(p+'_placa','Ponto Placa')] : [f(p+'_agulha','Ponto Agulha'), f(p+'_platina','Ponto Platina')])
-]});
+// Paleta por bloco (fundo claro, cor forte, cor do título) — mesma cor em formulário, ficha e impressão
+const PAL = {
+  id:    {bd:'#44505c', bg:'#f3f3f1', tx:'#2b343d'},
+  art:   {bd:'#1f8a8a', bg:'#e2f3f3', tx:'#0f5757'},   // artigo: verde-azulado
+  jersey:{bd:'#2f6fb3', bg:'#e6f0fb', tx:'#1b4a80'},   // jersey / fio principal: azul
+  lig:   {bd:'#2e8b57', bg:'#e4f5ea', tx:'#1b5e39'},   // ligação: verde
+  arg:   {bd:'#d9822b', bg:'#fdeedd', tx:'#8f4d0c'},   // argola: laranja
+  lycra: {bd:'#8e44ad', bg:'#f2e8f9', tx:'#5e2a78'},   // lycra: roxo
+  prod:  {bd:'#8a8578', bg:'#f0eee8', tx:'#4f4b42'}    // produção / descarga: cinza quente
+};
+// Bloco "linhas" (linhas:1) = pode ter várias linhas de fio; cada linha tem fio + LFA + afinação + pontos juntos.
+// A 1ª linha usa as chaves originais (compatível com os dados importados); as restantes ficam em <id>_mais.
+const ART  = extra => ({id:'art', t:'Artigo', c:'art', f:[f('artigo','Descrição do artigo de malha',{w:3}), ...extra]});
+const PROD = () => ({id:'prod', t:'Produção', c:'prod', f:[f('bloco','Bloco'), f('descarga','Descarga'), f('tiragem','Tiragem')]});
+const FIOBLK = fs => ({id:'f', t:'Fio e afinação', c:'jersey', linhas:1, f:fs});
+const LYCRA = fs => ({id:'ly', t:'Lycra', c:'lycra', linhas:1, pref:1, f:fs});
 
-// Campos comuns a todos os tipos (colunas próprias na tabela): tear, data, cliente, observacoes
 const JERSEY_LIKE = [
-  {t:'Fio', f:[f('jogo','Jogo'), f('fio','Fio',{w:2,multi:1}), f('cabos','Cabos'), f('lfa','LFA')]},
-  {t:'Afinação', f:[f('afinacao','Afinação'), f('ponto_placa','Ponto Placa')]},
-  {t:'Lycra', f:[f('lycra_desc','Lycra - descrição'), f('lycra_afin','Lycra - afinação')]},
-  {t:'Produção', f:[f('bloco','Bloco'), f('descarga','Descarga'), f('tiragem','Tiragem')]}
+  ART([f('jogo','Jogo')]),
+  FIOBLK([f('fio','Fio'), f('cabos','Cabos'), f('lfa','LFA'), f('afinacao','Afinação'), f('ponto_placa','Ponto Placa')]),
+  LYCRA([f('lycra_desc','Lycra - descrição'), f('lycra_afin','Afinação')]),
+  PROD()
 ];
 const RIB_LIKE = [
-  {t:'Fio', f:[f('jogo','Jogo'), f('selecao','Seleção'), f('fio','Fio',{w:2,multi:1}), f('cabos','Cabos'), f('lfa','LFA')]},
-  {t:'Afinação', f:[f('afin_fio','Afinação fio'), f('ponto_cima','Ponto cima'), f('ponto_baixo','Ponto baixo')]},
-  {t:'Lycra', f:[f('lycra_desc','Lycra - descrição'), f('afin_lycra','Afinação lycra'), f('tricotada','Tricotada')]},
-  {t:'Descarga / Disco', f:[f('descarga','Descarga'), f('disco','Disco')]}
+  ART([f('jogo','Jogo'), f('selecao','Seleção')]),
+  FIOBLK([f('fio','Fio'), f('cabos','Cabos'), f('lfa','LFA'), f('afin_fio','Afinação'), f('ponto_cima','Ponto cima'), f('ponto_baixo','Ponto baixo')]),
+  LYCRA([f('lycra_desc','Lycra - descrição'), f('afin_lycra','Afinação'), f('tricotada','Tricotada')]),
+  {id:'dd', t:'Descarga / Disco', c:'prod', f:[f('descarga','Descarga'), f('disco','Disco')]}
 ];
 // xl = ordem das colunas no Excel (para importar). skip = coluna a ignorar (Estado, Chave…)
 const XL_JERSEY = ['tear','data','cliente','jogo','fio','cabos','lfa','afinacao','ponto_placa','lycra_desc','lycra_afin','bloco','descarga','tiragem','observacoes','skip','skip'];
 const XL_RIB    = ['tear','jogo','data','cliente','selecao','fio','cabos','lfa','afin_fio','lycra_desc','afin_lycra','tricotada','ponto_cima','ponto_baixo','descarga','disco','observacoes','skip','skip'];
+const pontos = p => [f(p+'_lfa','LFA'), f(p+'_afin','Afinação'), f(p+'_agulha','Ponto Agulha'), f(p+'_platina','Ponto Platina')];
 
 const TIPOS = {
-  felpa: { nome:'Felpa Americana', cor:'#c2410c', sheet:'Felpas',
-    lfa:'j_lfa', cols:['gramagem','fio_jersey','j_afin','l_lfa','l_afin','a_lfa','a_afin','bloco','descarga','tiragem'],
-    grupos:[
-      {t:'Geral', f:[f('gramagem','Gramagem')]},
-      {t:'Fios', f:[f('fio_jersey','Fio Jersey',{w:2,multi:1}), f('fio_ligacao','Fio Ligação',{w:2,multi:1}), f('fio_argola','Fio Argola',{w:2,multi:1})]},
-      camada('j','Jersey'), camada('l','Ligação'), camada('a','Argola'), camada('ly','Lycra'),
-      {t:'Produção', f:[f('bloco','Bloco'), f('descarga','Descarga'), f('tiragem','Tiragem')]}
+  felpa: { nome:'Felpa Americana', cor:'#c2410c', sheet:'Felpas', lfa:'j_lfa',
+    cols:['gramagem','fio_jersey','j_afin','fio_ligacao','l_lfa','l_afin','fio_argola','a_lfa','a_afin','tiragem'],
+    blocos:[
+      ART([f('gramagem','Gramagem')]),
+      {id:'j',  t:'Jersey',  c:'jersey', linhas:1, pref:1, f:[f('fio_jersey','Fio Jersey'),   ...pontos('j')]},
+      {id:'l',  t:'Ligação', c:'lig',    linhas:1, pref:1, f:[f('fio_ligacao','Fio Ligação'), ...pontos('l')]},
+      {id:'a',  t:'Argola',  c:'arg',    linhas:1, pref:1, f:[f('fio_argola','Fio Argola'),   ...pontos('a')]},
+      {id:'ly', t:'Lycra',   c:'lycra',  linhas:1, pref:1, f:[f('fio_lycra','Lycra - descrição'), ...pontos('ly')]},
+      PROD()
     ],
     xl:['tear','data','cliente','gramagem','fio_jersey','fio_ligacao','fio_argola',
         'j_lfa','j_afin','j_agulha','j_platina','l_lfa','l_afin','l_agulha','l_platina',
         'a_lfa','a_afin','a_agulha','a_platina','ly_lfa','ly_afin','ly_agulha','ly_platina',
         'bloco','descarga','tiragem','observacoes','skip','skip'] },
-  jersey: { nome:'Jersey', cor:'#1f6f8b', sheet:'Jersey', lfa:'lfa', cols:['fio','afinacao','lycra_desc','lycra_afin','bloco','descarga','tiragem'], grupos:JERSEY_LIKE, xl:XL_JERSEY },
-  pique:  { nome:'Piqué',  cor:'#6d4c9f', sheet:'PIQUÉ',  lfa:'lfa', cols:['fio','afinacao','lycra_desc','lycra_afin','bloco','descarga','tiragem'], grupos:JERSEY_LIKE, xl:XL_JERSEY },
-  italiana:{ nome:'Felpa Italiana', cor:'#a21c4a', sheet:'Felpa Italiana',
-    lfa:'j_lfa', cols:['jogo','fio_jersey','j_afin','a_lfa','a_afin','lycra_desc','bloco','descarga','tiragem'],
-    grupos:[
-      {t:'Geral', f:[f('jogo','Jogo')]},
-      {t:'Jersey', f:[f('fio_jersey','Fio Jersey',{w:2,multi:1}), f('j_lfa','LFA'), f('j_afin','Afinação'), f('j_placa','Ponto Placa')]},
-      {t:'Argola', f:[f('fio_argola','Fio Argola',{w:2,multi:1}), f('a_lfa','LFA'), f('a_afin','Afinação'), f('a_placa','Ponto Placa')]},
-      {t:'Lycra', f:[f('lycra_desc','Lycra - descrição'), f('lycra_afin','Lycra - afinação')]},
-      {t:'Produção', f:[f('bloco','Bloco'), f('descarga','Descarga'), f('tiragem','Tiragem')]}
+  jersey: { nome:'Jersey', cor:'#1f6f8b', sheet:'Jersey', lfa:'lfa', cols:['fio','afinacao','lycra_desc','lycra_afin','bloco','descarga','tiragem'], blocos:JERSEY_LIKE, xl:XL_JERSEY },
+  pique:  { nome:'Piqué',  cor:'#6d4c9f', sheet:'PIQUÉ',  lfa:'lfa', cols:['fio','afinacao','lycra_desc','lycra_afin','bloco','descarga','tiragem'], blocos:JERSEY_LIKE, xl:XL_JERSEY },
+  italiana:{ nome:'Felpa Italiana', cor:'#a21c4a', sheet:'Felpa Italiana', lfa:'j_lfa',
+    cols:['jogo','fio_jersey','j_afin','fio_argola','a_lfa','a_afin','lycra_desc','tiragem'],
+    blocos:[
+      ART([f('jogo','Jogo')]),
+      {id:'j', t:'Jersey', c:'jersey', linhas:1, pref:1, f:[f('fio_jersey','Fio Jersey'), f('j_lfa','LFA'), f('j_afin','Afinação'), f('j_placa','Ponto Placa')]},
+      {id:'a', t:'Argola', c:'arg',    linhas:1, pref:1, f:[f('fio_argola','Fio Argola'), f('a_lfa','LFA'), f('a_afin','Afinação'), f('a_placa','Ponto Placa')]},
+      LYCRA([f('lycra_desc','Lycra - descrição'), f('lycra_afin','Afinação')]),
+      PROD()
     ],
     xl:['tear','data','cliente','jogo','fio_jersey','j_lfa','j_afin','j_placa','fio_argola','a_lfa','a_afin','a_placa','lycra_desc','lycra_afin','bloco','descarga','tiragem','observacoes','skip','skip'] },
-  rib:       { nome:'Rib',        cor:'#2e7d4f', sheet:'Rib',        lfa:'lfa', cols:['selecao','fio','afin_fio','lycra_desc','afin_lycra','ponto_cima','ponto_baixo','descarga','disco'], grupos:RIB_LIKE, xl:XL_RIB },
-  dupla:     { nome:'Dupla Face', cor:'#8a6d00', sheet:'Dupla Face', lfa:'lfa', cols:['selecao','fio','afin_fio','lycra_desc','afin_lycra','ponto_cima','ponto_baixo','descarga','disco'], grupos:RIB_LIKE, xl:XL_RIB },
-  interlock: { nome:'Interlock',  cor:'#37474f', sheet:'INTERLOCK',  lfa:'lfa', cols:['selecao','fio','afin_fio','lycra_desc','afin_lycra','ponto_cima','ponto_baixo','descarga','disco'], grupos:RIB_LIKE, xl:XL_RIB }
+  rib:       { nome:'Rib',        cor:'#2e7d4f', sheet:'Rib',        lfa:'lfa', cols:['selecao','fio','afin_fio','lycra_desc','afin_lycra','ponto_cima','ponto_baixo','descarga','disco'], blocos:RIB_LIKE, xl:XL_RIB },
+  dupla:     { nome:'Dupla Face', cor:'#8a6d00', sheet:'Dupla Face', lfa:'lfa', cols:['selecao','fio','afin_fio','lycra_desc','afin_lycra','ponto_cima','ponto_baixo','descarga','disco'], blocos:RIB_LIKE, xl:XL_RIB },
+  interlock: { nome:'Interlock',  cor:'#37474f', sheet:'INTERLOCK',  lfa:'lfa', cols:['selecao','fio','afin_fio','lycra_desc','afin_lycra','ponto_cima','ponto_baixo','descarga','disco'], blocos:RIB_LIKE, xl:XL_RIB }
 };
-// valores de um campo com vários fios: [1º, ...adicionais]
-const allVals = (d,k) => [d[k], ...(d[k+'_mais']||[])].filter(Boolean);
-const val = (d,k) => allVals(d,k).join(' + ');
-const labelOf = (t,k) => { if(k==='artigo') return 'Artigo'; if(k.endsWith('_mais')) return labelOf(t,k.slice(0,-5))+' (adicionais)'; for (const g of TIPOS[t].grupos) for (const x of g.f) if (x.k===k) return (g.f.length>1 && /^(Jersey|Ligação|Argola|Lycra)$/.test(g.t) && !/Lycra|Fio/.test(x.l) ? g.t+' · ' : '') + x.l; return k; };
+// chave do campo -> bloco a que pertence
+const KB = {};
+Object.entries(TIPOS).forEach(([k,t]) => { KB[k]={}; t.blocos.forEach(b => b.f.forEach(x => KB[k][x.k]=b)); });
+// todos os valores de um campo (1ª linha + linhas adicionais)
+const vals = (tipo,d,k) => { const b=KB[tipo][k], o=[d[k]]; if(b&&b.linhas) (d[b.id+'_mais']||[]).forEach(x=>o.push(x[k])); return o.filter(Boolean); };
+const val  = (tipo,d,k) => vals(tipo,d,k).join(' + ');
+const labelOf = (t,k) => { if(k==='artigo') return 'Artigo';
+  for (const b of TIPOS[t].blocos) for (const [i,x] of b.f.entries()) if (x.k===k) return (b.pref && i>0 ? b.t+' · ' : '') + x.l; return k; };
+// versão anterior guardava fios adicionais como texto em <fio>_mais: converte para linhas
+function migrar(tipo,d){
+  TIPOS[tipo].blocos.filter(b=>b.linhas).forEach(b => { const k=b.f[0].k+'_mais', a=d[k];
+    if(Array.isArray(a) && a.every(z=>typeof z==='string')){ d[b.id+'_mais']=[...(d[b.id+'_mais']||[]), ...a.map(z=>({[b.f[0].k]:z}))]; delete d[k]; } });
+  return d;
+}
+const flat = o => o==null ? '' : typeof o==='object' ? Object.values(o).map(flat).join(' ') : String(o);
 
 /* =====================================================================
    2. SUPABASE
@@ -223,7 +266,7 @@ async function fetchAll(table, col, asc){
   }
   return out;
 }
-async function loadAll(){ S.regs = await fetchAll(T_REG,'data',false); }
+async function loadAll(){ S.regs = await fetchAll(T_REG,'data',false); S.regs.forEach(r => { r.dados = migrar(r.tipo, r.dados||{}); }); }
 
 /* =====================================================================
    3. ROUTER
@@ -276,7 +319,7 @@ function viewLogin(){
 /* ---------- escolher tipo ---------- */
 function viewEscolher(){
   app.innerHTML = `<h1>Novo registo — escolha o tipo de malha</h1><div class="tipos">` +
-    Object.entries(TIPOS).map(([k,t]) => `<a href="#/novo/${k}" style="--c:${t.cor}">${esc(t.nome)}<small>${t.grupos.reduce((n,g)=>n+g.f.length,0)} campos de afinação</small></a>`).join('') + `</div>`;
+    Object.entries(TIPOS).map(([k,t]) => `<a href="#/novo/${k}" style="--c:${t.cor}">${esc(t.nome)}<small>${t.blocos.reduce((n,g)=>n+g.f.length,0)} campos de afinação</small></a>`).join('') + `</div>`;
 }
 
 /* ---------- lista ---------- */
@@ -306,15 +349,15 @@ function viewList(tipo){
     const rows = base.filter(r =>
       (!S.filt.tear || String(r.tear)===S.filt.tear) && (!S.filt.cliente || r.cliente===S.filt.cliente) &&
       (!S.filt.ano || r.data.startsWith(S.filt.ano)) &&
-      (!q || (r.cliente+' '+(r.observacoes||'')+' '+Object.values(r.dados||{}).join(' ')+' '+r.tear).toLowerCase().includes(q)));
+      (!q || (r.cliente+' '+(r.observacoes||'')+' '+flat(r.dados)+' '+r.tear).toLowerCase().includes(q)));
     $('#tb').innerHTML = rows.map(r => {
       const rt = TIPOS[r.tipo]; const d = r.dados||{};
       return `<tr class="row" data-id="${r.id}">
         ${t?'':`<td><span class="chip" style="background:${rt.cor}1a;color:${rt.cor}">${esc(rt.nome)}</span></td>`}
         <td class="tear">${r.tear}</td><td>${fmtData(r.data)}</td><td>${esc(r.cliente)}</td>
-        <td class="art">${esc(d.artigo)}</td><td class="lfa">${esc(val(d,rt.lfa))}</td>
-        ${t ? t.cols.map(k=>`<td class="hide-m">${esc(val(d,k))}</td>`).join('')
-            : `<td class="hide-m">${esc(val(d,'fio')||val(d,'fio_jersey'))}</td><td class="hide-m">${esc(d.afinacao||d.afin_fio||d.j_afin)}</td>`}
+        <td class="art">${esc(d.artigo)}</td><td class="lfa">${esc(vals(r.tipo,d,rt.lfa)[0])}${vals(r.tipo,d,rt.lfa).length>1?` <small>+${vals(r.tipo,d,rt.lfa).length-1}</small>`:''}</td>
+        ${t ? t.cols.map(k=>`<td class="hide-m">${esc(val(r.tipo,d,k))}</td>`).join('')
+            : `<td class="hide-m">${esc(val(r.tipo,d,'fio')||val(r.tipo,d,'fio_jersey'))}</td><td class="hide-m">${esc(val(r.tipo,d,'afinacao')||val(r.tipo,d,'afin_fio')||val(r.tipo,d,'j_afin'))}</td>`}
         <td class="hide-m obs" title="${esc(r.observacoes)}">${esc(r.observacoes)}</td>
         <td class="acts"><a class="btn sm" href="#/ficha/${r.id}">Ficha</a> <a class="btn sm" href="#/editar/${r.id}">Editar</a>
           <a class="btn sm" href="#/duplicar/${r.id}">Duplicar</a> <button class="btn sm dng" data-del="${r.id}">Eliminar</button></td></tr>`;
@@ -342,49 +385,51 @@ async function apagar(id){
 }
 
 /* ---------- formulário ---------- */
+const sty = c => `--bd:${PAL[c].bd};--bg:${PAL[c].bg};--tx:${PAL[c].tx}`;
 async function viewForm({tipo, reg, copia}){
   const edit = !!reg; const src = reg || copia;
   tipo = tipo || reg.tipo; const t = TIPOS[tipo];
   const d = src ? (src.dados||{}) : {};
   const clientes = [...new Set(S.regs.map(r=>r.cliente))].sort((a,b)=>a.localeCompare(b,'pt'));
-  const rowx = (k,v,n) => `<div class="xrow"><input name="d_${k}_mais" value="${esc(v)}" placeholder="${esc(labelOf(tipo,k))} ${n}" autocomplete="off"><button type="button" class="btn sm dng rmfio" title="Remover fio">×</button></div>`;
-  const input = x => {
-    const cls = x.w===2?'w2':x.w===3?'w3':'';
-    if(x.multi) return `<div class="mfio ${cls}" data-k="${x.k}"><label class="f">${esc(x.l)}<input name="d_${x.k}" value="${esc(d[x.k])}" autocomplete="off"></label>
-      <div class="extras">${(d[x.k+'_mais']||[]).map((v,i)=>rowx(x.k,v,i+2)).join('')}</div><button type="button" class="btn sm addfio">+ Adicionar fio</button></div>`;
-    return `<label class="f ${cls}">${esc(x.l)}<input name="d_${x.k}" value="${esc(d[x.k])}" autocomplete="off"></label>`;
-  };
+  // uma linha de fio: fio + LFA + afinação + pontos, lado a lado
+  const rowHtml = (b,v,extra) => `<div class="yrow ${extra?'extra':''}" style="--n:${b.f.length-1}">` +
+    b.f.map(x => `<label class="f"><span class="lb">${esc(x.l)}</span><input data-k="${x.k}" ${extra?'':`name="d_${x.k}"`} value="${esc(v[x.k])}" placeholder="${esc(x.l)}" autocomplete="off"></label>`).join('') +
+    (extra ? '<button type="button" class="btn sm dng rmfio" title="Remover esta linha">×</button>' : '<span></span>') + '</div>';
+  const blkHtml = b => b.linhas
+    ? `<section class="blk" data-b="${b.id}" style="${sty(b.c)}"><h2>${esc(b.t)}</h2><div class="rows">${rowHtml(b,d,false)}${(d[b.id+'_mais']||[]).map(v=>rowHtml(b,v,true)).join('')}</div><button type="button" class="btn sm addfio">+ Adicionar fio</button></section>`
+    : `<section class="blk" data-b="${b.id}" style="${sty(b.c)}"><h2>${esc(b.t)}</h2><div class="grid">${b.f.map(x=>`<label class="f ${x.w===3?'w3':''}">${esc(x.l)}<input name="d_${x.k}" value="${esc(d[x.k])}" autocomplete="off"></label>`).join('')}</div></section>`;
 
   app.innerHTML = `<form id="rf" autocomplete="off" style="max-width:1600px;margin:0 auto">
     <h1><span class="chip" style="background:${t.cor}1a;color:${t.cor}">${esc(t.nome)}</span> ${edit?'Editar afinação':copia?'Nova afinação (cópia)':'Nova afinação'}</h1>
-    <div class="card">
-      <div class="fgroup"><h2>Identificação</h2><div class="grid">
-        <label class="f"><span class="req">Nº Tear</span><input name="tear" type="number" min="1" required inputmode="numeric" value="${src?src.tear:''}"></label>
-        <label class="f"><span class="req">Data</span><input name="data" type="date" required value="${edit?src.data:hoje()}"></label>
-        <label class="f w2"><span class="req">Cliente</span><input name="cliente" list="dl-cli" required value="${esc(src?src.cliente:'')}"></label>
-        <label class="f w3">Descrição do artigo de malha<input name="artigo" value="${esc(d.artigo)}" placeholder="ex.: Jersey 100% algodão penteado, 160 g/m², cru" autocomplete="off"></label>
-        <datalist id="dl-cli">${clientes.map(c=>`<option value="${esc(c)}">`).join('')}</datalist>
-      </div></div>
-      ${t.grupos.map(g=>`<div class="fgroup"><h2>${esc(g.t)}</h2><div class="grid">${g.f.map(input).join('')}</div></div>`).join('')}
-      <div class="fgroup"><h2>Observações</h2><label class="f"><textarea name="observacoes">${esc(src?src.observacoes:'')}</textarea></label></div>
-    </div>
+    <section class="blk" style="${sty('id')}"><h2>Identificação</h2><div class="grid">
+      <label class="f"><span class="req">Nº Tear</span><input name="tear" type="number" min="1" required inputmode="numeric" value="${src?src.tear:''}"></label>
+      <label class="f"><span class="req">Data</span><input name="data" type="date" required value="${edit?src.data:hoje()}"></label>
+      <label class="f w2"><span class="req">Cliente</span><input name="cliente" list="dl-cli" required value="${esc(src?src.cliente:'')}"></label>
+      <datalist id="dl-cli">${clientes.map(c=>`<option value="${esc(c)}">`).join('')}</datalist>
+    </div></section>
+    ${t.blocos.map(blkHtml).join('')}
+    <section class="blk" style="${sty('id')}"><h2>Observações</h2><label class="f"><textarea name="observacoes">${esc(src?src.observacoes:'')}</textarea></label></section>
     <div class="formbar"><button class="btn pri" id="save">Guardar</button><a class="btn" href="${edit?'#/ficha/'+reg.id:'#/tipo/'+tipo}">Cancelar</a></div>
   </form>`;
 
-
   $('#rf').addEventListener('click', e => {
     const add = e.target.closest('.addfio'), rm = e.target.closest('.rmfio');
-    if(add){ const box=add.closest('.mfio'), ex=$('.extras',box); ex.insertAdjacentHTML('beforeend', rowx(box.dataset.k,'',ex.children.length+2)); ex.lastElementChild.querySelector('input').focus(); }
-    if(rm){ const ex=rm.closest('.extras'); rm.closest('.xrow').remove(); [...ex.children].forEach((r,i)=>r.querySelector('input').placeholder=labelOf(tipo,ex.closest('.mfio').dataset.k)+' '+(i+2)); }
+    if(add){ const sec=add.closest('[data-b]'), b=t.blocos.find(x=>x.id===sec.dataset.b), rows=$('.rows',sec);
+      rows.insertAdjacentHTML('beforeend', rowHtml(b,{},true)); rows.lastElementChild.querySelector('input').focus(); }
+    if(rm) rm.closest('.yrow').remove();
   });
 
   $('#rf').onsubmit = async e => {
     e.preventDefault();
     const fd = new FormData(e.target);
     const row = { tipo, tear:+fd.get('tear'), data:fd.get('data'), cliente:fd.get('cliente').trim(), observacoes:(fd.get('observacoes')||'').trim()||null, dados:{} };
-    t.grupos.forEach(g => g.f.forEach(x => { const v=(fd.get('d_'+x.k)||'').trim(); if(v) row.dados[x.k]=v;
-      if(x.multi){ const ex=fd.getAll('d_'+x.k+'_mais').map(z=>z.trim()).filter(Boolean); if(ex.length) row.dados[x.k+'_mais']=ex; } }));
-    const art=(fd.get('artigo')||'').trim(); if(art) row.dados.artigo=art;
+    t.blocos.forEach(b => {
+      b.f.forEach(x => { const v=(fd.get('d_'+x.k)||'').trim(); if(v) row.dados[x.k]=v; });
+      if(b.linhas){
+        const ex = $$('.yrow.extra', $(`[data-b="${b.id}"]`)).map(r => { const o={}; $$('input',r).forEach(i => { const v=i.value.trim(); if(v) o[i.dataset.k]=v; }); return o; }).filter(o=>Object.keys(o).length);
+        if(ex.length) row.dados[b.id+'_mais']=ex;
+      }
+    });
     const dup = S.regs.find(r => r.tipo===tipo && r.tear===row.tear && r.data===row.data && r.cliente.toLowerCase()===row.cliente.toLowerCase() && (!edit || r.id!==reg.id));
     if(dup && !confirm('Já existe uma afinação deste tipo para o mesmo tear, data e cliente.\nGuardar mesmo assim?')) return;
     const btn=$('#save'); btn.disabled=true; btn.textContent='A guardar…';
@@ -403,17 +448,24 @@ async function viewFicha(r){
   const t = TIPOS[r.tipo], d = r.dados||{};
   const draw = () => {
     const vazios = $('#ov')?.checked;
-    const grupos = t.grupos.map(g => {
-      const fs = g.f.filter(x => vazios || allVals(d,x.k).length);
+    const blk = b => {
+      const st = sty(b.c);
+      if(b.linhas){
+        let lines = [d, ...(d[b.id+'_mais']||[])].filter(l => b.f.some(x=>l[x.k]));
+        if(!lines.length){ if(!vazios) return ''; lines=[{}]; }
+        const cols = b.f.filter(x => vazios || lines.some(l=>l[x.k]));
+        return `<section class="blk" style="${st}"><h2>${esc(b.t)}</h2><table class="lt"><thead><tr>${cols.map(x=>`<th>${esc(x.l)}</th>`).join('')}</tr></thead>
+          <tbody>${lines.map(l=>`<tr>${cols.map(x=>`<td class="${x===b.f[0]?'fio':''}">${esc(l[x.k])}</td>`).join('')}</tr>`).join('')}</tbody></table></section>`;
+      }
+      const fs = b.f.filter(x => vazios || d[x.k]);
       if(!fs.length) return '';
-      return `<div class="fgroup"><h2>${esc(g.t)}</h2><div class="kv">${fs.map(x=>`<div class="${x.w===2?'w2':''}"><b>${esc(x.l)}</b><span>${allVals(d,x.k).map(esc).join('<br>')||'&nbsp;'}</span></div>`).join('')}</div></div>`;
-    }).join('');
+      return `<section class="blk" style="${st}"><h2>${esc(b.t)}</h2><div class="kv">${fs.map(x=>`<div class="${x.w===3?'w3':''}"><b>${esc(x.l)}</b><span class="${x.w===3?'big':''}">${esc(d[x.k])||'&nbsp;'}</span></div>`).join('')}</div></section>`;
+    };
     $('#sheet').innerHTML = `
       <div class="sh-head"><div><div class="emp">${esc(CFG.EMPRESA||'')}</div><h1>Ficha técnica de afinação</h1></div><div class="tp">${esc(t.nome)}</div></div>
-      <div class="meta"><div><b>Nº Tear</b><span class="big">${r.tear}</span></div><div><b>Data</b><span class="big">${fmtData(r.data)}</span></div><div style="grid-column:span 2"><b>Cliente</b><span class="big">${esc(r.cliente)}</span></div>
-        ${d.artigo||vazios?`<div style="grid-column:1/-1"><b>Artigo</b><span class="big">${esc(d.artigo)||'&nbsp;'}</span></div>`:''}</div>
-      ${grupos}
-      ${r.observacoes?`<div class="fgroup"><h2>Observações</h2><div style="white-space:pre-wrap;border:1px solid var(--line);border-radius:6px;padding:8px">${esc(r.observacoes)}</div></div>`:''}
+      <div class="meta"><div><b>Nº Tear</b><span class="big">${r.tear}</span></div><div><b>Data</b><span class="big">${fmtData(r.data)}</span></div><div style="grid-column:span 2"><b>Cliente</b><span class="big">${esc(r.cliente)}</span></div></div>
+      ${t.blocos.map(blk).join('')}
+      ${r.observacoes?`<section class="blk" style="${sty('id')}"><h2>Observações</h2><div style="white-space:pre-wrap">${esc(r.observacoes)}</div></section>`:''}
       <div class="sh-foot"><span>Registo: ${new Date(r.created_at).toLocaleDateString('pt-PT')}</span><span>Impresso em ${new Date().toLocaleDateString('pt-PT')}</span></div>`;
   };
   app.innerHTML = `
@@ -449,7 +501,9 @@ function viewTools(){
     const q = v => '"'+String(v??'').replace(/"/g,'""')+'"';
     const lines = [['Tipo','Nº Tear','Data','Cliente','Campo','Valor'].map(q).join(';')];
     S.regs.forEach(r => { const base=[TIPOS[r.tipo].nome,r.tear,fmtData(r.data),r.cliente];
-      Object.entries(r.dados||{}).forEach(([k,v]) => lines.push([...base,labelOf(r.tipo,k),[].concat(v).join(' + ')].map(q).join(';')));
+      Object.entries(r.dados||{}).forEach(([k,v]) => {
+        if(Array.isArray(v)) v.forEach((o,i) => Object.entries(o).forEach(([kk,vv]) => lines.push([...base,labelOf(r.tipo,kk)+` (linha ${i+2})`,vv].map(q).join(';'))));
+        else lines.push([...base,labelOf(r.tipo,k),v].map(q).join(';')); });
       if(r.observacoes) lines.push([...base,'Observações',r.observacoes].map(q).join(';')); });
     baixar('afinacoes-'+hoje()+'.csv', '﻿'+lines.join('\r\n'), 'text/csv');
   };
