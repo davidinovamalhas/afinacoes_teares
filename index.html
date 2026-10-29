@@ -176,22 +176,26 @@ const PROD = () => ({id:'prod', t:'Produção', c:'prod', f:[f('bloco','Bloco'),
 const FIOBLK = fs => ({id:'f', t:'Fio e afinação', c:'jersey', linhas:1, f:fs});
 const LYCRA = fs => ({id:'ly', t:'Lycra', c:'lycra', linhas:1, pref:1, f:fs});
 
-const JERSEY_LIKE = [
+const pontos = p => [f(p+'_lfa','LFA'), f(p+'_afin','Afinação'), f(p+'_agulha','Ponto Agulha'), f(p+'_platina','Ponto Platina')];
+const ACUM = () => ({id:'al', t:'Acumulação / Ligação', c:'lig', linhas:1, pref:1, f:[f('fio_acum','Fio Acumulação / Ligação'), ...pontos('al')]});
+const jerseyLike = acum => [
   ART([f('jogo','Jogo')]),
   FIOBLK([f('fio','Fio'), f('cabos','Cabos'), f('lfa','LFA'), f('afinacao','Afinação'), f('ponto_placa','Ponto Placa')]),
+  ...(acum ? [ACUM()] : []),
   LYCRA([f('lycra_desc','Lycra - descrição'), f('lycra_afin','Afinação')]),
   PROD()
 ];
-const RIB_LIKE = [
+const ribLike = acum => [
   ART([f('jogo','Jogo'), f('selecao','Seleção')]),
   FIOBLK([f('fio','Fio'), f('cabos','Cabos'), f('lfa','LFA'), f('afin_fio','Afinação'), f('ponto_cima','Ponto cima'), f('ponto_baixo','Ponto baixo')]),
+  ...(acum ? [ACUM()] : []),
   LYCRA([f('lycra_desc','Lycra - descrição'), f('afin_lycra','Afinação'), f('tricotada','Tricotada')]),
   {id:'dd', t:'Descarga / Disco', c:'prod', f:[f('descarga','Descarga'), f('disco','Disco')]}
 ];
+const JERSEY_LIKE = jerseyLike(false), PIQUE_LIKE = jerseyLike(true), RIB_LIKE = ribLike(false), RIBA_LIKE = ribLike(true);
 // xl = ordem das colunas no Excel (para importar). skip = coluna a ignorar (Estado, Chave…)
 const XL_JERSEY = ['tear','data','cliente','jogo','fio','cabos','lfa','afinacao','ponto_placa','lycra_desc','lycra_afin','bloco','descarga','tiragem','observacoes','skip','skip'];
 const XL_RIB    = ['tear','jogo','data','cliente','selecao','fio','cabos','lfa','afin_fio','lycra_desc','afin_lycra','tricotada','ponto_cima','ponto_baixo','descarga','disco','observacoes','skip','skip'];
-const pontos = p => [f(p+'_lfa','LFA'), f(p+'_afin','Afinação'), f(p+'_agulha','Ponto Agulha'), f(p+'_platina','Ponto Platina')];
 
 const TIPOS = {
   felpa: { nome:'Felpa Americana', cor:'#c2410c', sheet:'Felpas', lfa:'j_lfa',
@@ -209,7 +213,7 @@ const TIPOS = {
         'a_lfa','a_afin','a_agulha','a_platina','ly_lfa','ly_afin','ly_agulha','ly_platina',
         'bloco','descarga','tiragem','observacoes','skip','skip'] },
   jersey: { nome:'Jersey', cor:'#1f6f8b', sheet:'Jersey', lfa:'lfa', cols:['fio','afinacao','lycra_desc','lycra_afin','bloco','descarga','tiragem'], blocos:JERSEY_LIKE, xl:XL_JERSEY },
-  pique:  { nome:'Piqué',  cor:'#6d4c9f', sheet:'PIQUÉ',  lfa:'lfa', cols:['fio','afinacao','lycra_desc','lycra_afin','bloco','descarga','tiragem'], blocos:JERSEY_LIKE, xl:XL_JERSEY },
+  pique:  { nome:'Piqué',  cor:'#6d4c9f', sheet:'PIQUÉ',  lfa:'lfa', cols:['fio','afinacao','fio_acum','al_lfa','al_afin','lycra_desc','lycra_afin','bloco','descarga','tiragem'], blocos:PIQUE_LIKE, xl:XL_JERSEY },
   italiana:{ nome:'Felpa Italiana', cor:'#a21c4a', sheet:'Felpa Italiana', lfa:'j_lfa',
     cols:['jogo','fio_jersey','j_afin','fio_argola','a_lfa','a_afin','lycra_desc','tiragem'],
     blocos:[
@@ -221,8 +225,8 @@ const TIPOS = {
     ],
     xl:['tear','data','cliente','jogo','fio_jersey','j_lfa','j_afin','j_placa','fio_argola','a_lfa','a_afin','a_placa','lycra_desc','lycra_afin','bloco','descarga','tiragem','observacoes','skip','skip'] },
   rib:       { nome:'Rib',        cor:'#2e7d4f', sheet:'Rib',        lfa:'lfa', cols:['selecao','fio','afin_fio','lycra_desc','afin_lycra','ponto_cima','ponto_baixo','descarga','disco'], blocos:RIB_LIKE, xl:XL_RIB },
-  dupla:     { nome:'Dupla Face', cor:'#8a6d00', sheet:'Dupla Face', lfa:'lfa', cols:['selecao','fio','afin_fio','lycra_desc','afin_lycra','ponto_cima','ponto_baixo','descarga','disco'], blocos:RIB_LIKE, xl:XL_RIB },
-  interlock: { nome:'Interlock',  cor:'#37474f', sheet:'INTERLOCK',  lfa:'lfa', cols:['selecao','fio','afin_fio','lycra_desc','afin_lycra','ponto_cima','ponto_baixo','descarga','disco'], blocos:RIB_LIKE, xl:XL_RIB }
+  dupla:     { nome:'Dupla Face', cor:'#8a6d00', sheet:'Dupla Face', lfa:'lfa', cols:['selecao','fio','afin_fio','fio_acum','al_lfa','al_afin','lycra_desc','afin_lycra','ponto_cima','ponto_baixo','descarga','disco'], blocos:RIBA_LIKE, xl:XL_RIB },
+  interlock: { nome:'Interlock',  cor:'#37474f', sheet:'INTERLOCK',  lfa:'lfa', cols:['selecao','fio','afin_fio','fio_acum','al_lfa','al_afin','lycra_desc','afin_lycra','ponto_cima','ponto_baixo','descarga','disco'], blocos:RIBA_LIKE, xl:XL_RIB }
 };
 // chave do campo -> bloco a que pertence
 const KB = {};
